@@ -8792,7 +8792,7 @@ build_lb_rules(struct hmap *lflows, struct ovn_lb_datapaths *lb_dps,
                       lb_vip->vip_str);
         int priority = 110;
         if (lb_vip->port_str) {
-            ds_put_format(match, " && %s.dst == %s", lb->proto,
+            ds_put_format(match, " && ct_%s.dst == %s", lb->proto,
                           lb_vip->port_str);
             priority = 120;
         }
