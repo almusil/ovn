@@ -1193,6 +1193,12 @@ ct_lb(backends=fd0f::2, fd0f::3, );
     encodes as group:5
     uses group: id(5), name(type=select,selection_method=dp_hash,bucket=bucket_id=0,weight:100,actions=ct(nat(dst=fd0f::2),commit,table=oflow_in_table,zone=NXM_NX_REG13[[0..15]],exec(set_field:2/2->ct_label)),bucket=bucket_id=1,weight:100,actions=ct(nat(dst=fd0f::3),commit,table=oflow_in_table,zone=NXM_NX_REG13[[0..15]],exec(set_field:2/2->ct_label)))
     has prereqs ip
+ct_clear; ct_lb;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG13[[0..15]],nat)
+    has prereqs ip
+ct_clear; ct_lb; reg8[[7]] = 1;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG13[[0..15]],nat),set_field:0x8000000000/0x8000000000->xreg4
+    has prereqs ip
 
 ct_lb(backends=192.168.1.2:);
     Syntax error at `)' expecting port number.
@@ -1263,6 +1269,12 @@ ct_lb_mark(backends=192.168.1.2:80,192.168.1.3:80; hash_fields="eth_src,eth_dst,
 ct_next;
     encodes as ct(table=oflow_in_table,zone=NXM_NX_REG13[[0..15]])
     has prereqs ip
+ct_clear; ct_next;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG13[[0..15]])
+    has prereqs ip
+ct_clear; ct_next; reg8[[7]] = 1;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG13[[0..15]]),set_field:0x8000000000/0x8000000000->xreg4
+    has prereqs ip
 
 # ct_commit
 ct_commit;
@@ -1318,6 +1330,9 @@ ct_commit { ip4.dst = 192.168.0.1; };
 reg8[[17]] = 1; ct_commit { ct_mark.blocked = 1; };
     encodes as set_field:0x2000000000000/0x2000000000000->xreg4,ct(commit,zone=NXM_NX_REG13[[0..15]],exec(set_field:0x1/0x1->ct_mark))
     has prereqs ip
+ct_clear; ct_commit { ct_mark.blocked = 1; }; reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,zone=NXM_NX_REG13[[0..15]],exec(set_field:0x1/0x1->ct_mark)),set_field:0x8000000000/0x8000000000->xreg4
+    has prereqs ip
 
 # ct_commit_to_zone
 ct_commit_to_zone(dnat);
@@ -1325,6 +1340,12 @@ ct_commit_to_zone(dnat);
     has prereqs ip
 ct_commit_to_zone(snat);
     encodes as ct(commit,table=oflow_in_table,zone=NXM_NX_REG13[[0..15]])
+    has prereqs ip
+ct_clear; ct_commit_to_zone(dnat);
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG13[[0..15]])
+    has prereqs ip
+ct_clear; ct_commit_to_zone(snat); reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG13[[0..15]]),set_field:0x8000000000/0x8000000000->xreg4
     has prereqs ip
 ct_commit_to_zone;
     Syntax error at `;' expecting `('.
@@ -1381,6 +1402,12 @@ ct_dnat(192.168.1.2, 1-3000);
     formats as ct_dnat(192.168.1.2,1-3000);
     encodes as ct(commit,table=oflow_in_table,zone=NXM_NX_REG11[[0..15]],nat(dst=192.168.1.2:1-3000,random))
     has prereqs ip
+ct_clear; ct_dnat;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG11[[0..15]],nat)
+    has prereqs ip
+ct_clear; ct_dnat(192.168.1.2); reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG11[[0..15]],nat(dst=192.168.1.2)),set_field:0x8000000000/0x8000000000->xreg4
+    has prereqs ip
 
 ct_dnat(192.168.1.2, 192.168.1.3);
     Syntax error at `192.168.1.3' expecting Integer for port range.
@@ -1414,6 +1441,12 @@ ct_dnat_in_czone(fd11::2);
 ct_dnat_in_czone(192.168.1.2, 1-3000);
     formats as ct_dnat_in_czone(192.168.1.2,1-3000);
     encodes as ct(commit,table=oflow_in_table,zone=NXM_NX_REG11[[0..15]],nat(dst=192.168.1.2:1-3000,random))
+    has prereqs ip
+ct_clear; ct_dnat_in_czone;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG11[[0..15]],nat)
+    has prereqs ip
+ct_clear; ct_dnat_in_czone(192.168.1.2); reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG11[[0..15]],nat(dst=192.168.1.2)),set_field:0x8000000000/0x8000000000->xreg4
     has prereqs ip
 
 ct_dnat_in_czone(192.168.1.2, 192.168.1.3);
@@ -1449,6 +1482,12 @@ ct_snat(192.168.1.2, 1-3000);
     formats as ct_snat(192.168.1.2,1-3000);
     encodes as ct(commit,table=oflow_in_table,zone=NXM_NX_REG12[[0..15]],nat(src=192.168.1.2:1-3000,random))
     has prereqs ip
+ct_clear; ct_snat;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG12[[0..15]],nat)
+    has prereqs ip
+ct_clear; ct_snat(192.168.1.2); reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG12[[0..15]],nat(src=192.168.1.2)),set_field:0x8000000000/0x8000000000->xreg4
+    has prereqs ip
 
 ct_snat(192.168.1.2, 192.168.1.3);
     Syntax error at `192.168.1.3' expecting Integer for port range.
@@ -1482,6 +1521,12 @@ ct_snat_in_czone(fd11::2);
 ct_snat_in_czone(192.168.1.2, 1-3000);
     formats as ct_snat_in_czone(192.168.1.2,1-3000);
     encodes as ct(commit,table=oflow_in_table,zone=NXM_NX_REG11[[0..15]],nat(src=192.168.1.2:1-3000,random))
+    has prereqs ip
+ct_clear; ct_snat_in_czone;
+    encodes as ct_clear,ct(table=19,zone=NXM_NX_REG11[[0..15]],nat)
+    has prereqs ip
+ct_clear; ct_snat_in_czone(192.168.1.2); reg8[[7]] = 1;
+    encodes as ct_clear,ct(commit,table=19,zone=NXM_NX_REG11[[0..15]],nat(src=192.168.1.2)),set_field:0x8000000000/0x8000000000->xreg4
     has prereqs ip
 
 ct_snat_in_czone(192.168.1.2, 192.168.1.3);

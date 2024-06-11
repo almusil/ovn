@@ -1803,6 +1803,7 @@ add_lb_ct_snat_hairpin_vip_flow(const struct ovn_controller_lb *lb,
         address_family = AF_INET6;
     }
 
+    const size_t ct_offset = ofpacts.size;
     struct ofpact_conntrack *ct = ofpact_put_CT(&ofpacts);
     ct->recirc_table = NX_CT_RECIRC_NONE;
     ct->zone_src.field = mf_from_id(MFF_LOG_SNAT_ZONE);
@@ -1810,10 +1811,6 @@ add_lb_ct_snat_hairpin_vip_flow(const struct ovn_controller_lb *lb,
     ct->zone_src.n_bits = 16;
     ct->flags = NX_CT_F_COMMIT;
     ct->alg = 0;
-
-    size_t nat_offset;
-    nat_offset = ofpacts.size;
-    ofpbuf_pull(&ofpacts, nat_offset);
 
     struct ofpact_nat *nat = ofpact_put_NAT(&ofpacts);
     nat->flags = NX_NAT_F_SRC;
@@ -1828,8 +1825,10 @@ add_lb_ct_snat_hairpin_vip_flow(const struct ovn_controller_lb *lb,
                                    ? lb->hairpin_snat_ips.ipv6_addrs[0].addr
                                    : lb_vip->vip;
     }
-    ofpacts.header = ofpbuf_push_uninit(&ofpacts, nat_offset);
-    ofpact_finish(&ofpacts, &ct->ofpact);
+
+    ct = ofpbuf_at_assert(&ofpacts, ct_offset, sizeof *ct);
+    ofpacts.header = ct;
+    ofpact_finish_CT(&ofpacts, &ct);
 
     struct match match = MATCH_CATCHALL_INITIALIZER;
 
