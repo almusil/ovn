@@ -34,7 +34,6 @@
 #include "lb.h"
 #include "lib/chassis-index.h"
 #include "lib/ip-mcast-index.h"
-#include "lib/static-mac-binding-index.h"
 #include "lib/copp.h"
 #include "lib/mcast-group-index.h"
 #include "lib/ovn-l7.h"
@@ -18086,23 +18085,21 @@ mirror_needs_update(const struct nbrec_mirror *nb_mirror,
 }
 
 static void
-sync_mirrors_iterate_nb_mirror(struct ovsdb_idl_txn *ovnsb_txn,
-                               const char *mirror_name,
-                               const struct nbrec_mirror *nb_mirror,
-                               struct shash *sb_mirrors)
+sync_nb_and_sb_mirror(struct ovsdb_idl_txn *ovnsb_txn,
+                      const char *mirror_name,
+                      const struct nbrec_mirror *nb_mirror,
+                      const struct sbrec_mirror_table *sbrec_mirror_table)
 {
-    const struct sbrec_mirror *sb_mirror;
-    bool new_sb_mirror = false;
+    const struct uuid *nb_uuid = &nb_mirror->header_.uuid;
+    const struct sbrec_mirror *sb_mirror =
+        sbrec_mirror_table_get_for_uuid(sbrec_mirror_table, nb_uuid);
 
-    sb_mirror = shash_find_data(sb_mirrors, mirror_name);
     if (!sb_mirror) {
-        sb_mirror = sbrec_mirror_insert(ovnsb_txn);
+        sb_mirror = sbrec_mirror_insert_persist_uuid(ovnsb_txn, nb_uuid);
         sbrec_mirror_set_name(sb_mirror, mirror_name);
-        shash_add(sb_mirrors, sb_mirror->name, sb_mirror);
-        new_sb_mirror = true;
     }
 
-    if (new_sb_mirror || mirror_needs_update(nb_mirror, sb_mirror)) {
+    if (mirror_needs_update(nb_mirror, sb_mirror)) {
         sbrec_mirror_set_filter(sb_mirror, nb_mirror->filter);
         sbrec_mirror_set_index(sb_mirror, nb_mirror->index);
         sbrec_mirror_set_sink(sb_mirror, nb_mirror->sink);
@@ -18115,26 +18112,19 @@ sync_mirrors(struct ovsdb_idl_txn *ovnsb_txn,
              const struct nbrec_mirror_table *nbrec_mirror_table,
              const struct sbrec_mirror_table *sbrec_mirror_table)
 {
-    struct shash sb_mirrors = SHASH_INITIALIZER(&sb_mirrors);
-
     const struct sbrec_mirror *sb_mirror;
-    SBREC_MIRROR_TABLE_FOR_EACH (sb_mirror, sbrec_mirror_table) {
-        shash_add(&sb_mirrors, sb_mirror->name, sb_mirror);
+    SBREC_MIRROR_TABLE_FOR_EACH_SAFE (sb_mirror, sbrec_mirror_table) {
+        if (!nbrec_mirror_table_get_for_uuid(nbrec_mirror_table,
+                                             &sb_mirror->header_.uuid)) {
+            sbrec_mirror_delete(sb_mirror);
+        }
     }
 
     const struct nbrec_mirror *nb_mirror;
     NBREC_MIRROR_TABLE_FOR_EACH (nb_mirror, nbrec_mirror_table) {
-        sync_mirrors_iterate_nb_mirror(ovnsb_txn, nb_mirror->name, nb_mirror,
-                                       &sb_mirrors);
-        shash_find_and_delete(&sb_mirrors, nb_mirror->name);
+        sync_nb_and_sb_mirror(ovnsb_txn, nb_mirror->name,
+                              nb_mirror, sbrec_mirror_table);
     }
-
-    struct shash_node *node, *next;
-    SHASH_FOR_EACH_SAFE (node, next, &sb_mirrors) {
-        sbrec_mirror_delete(node->data);
-        shash_delete(&sb_mirrors, node);
-    }
-    shash_destroy(&sb_mirrors);
 }
 
 /*
@@ -18152,7 +18142,7 @@ struct dns_info {
 };
 
 static inline struct dns_info *
-get_dns_info_from_hmap(struct hmap *dns_map, struct uuid *uuid)
+get_dns_info_from_hmap(struct hmap *dns_map, const struct uuid *uuid)
 {
     struct dns_info *dns_info;
     size_t hash = uuid_hash(uuid);
@@ -18198,15 +18188,8 @@ sync_dns_entries(struct ovsdb_idl_txn *ovnsb_txn,
 
     const struct sbrec_dns *sbrec_dns;
     SBREC_DNS_TABLE_FOR_EACH_SAFE (sbrec_dns, sbrec_dns_table) {
-        const char *nb_dns_uuid = smap_get(&sbrec_dns->external_ids, "dns_id");
-        struct uuid dns_uuid;
-        if (!nb_dns_uuid || !uuid_from_string(&dns_uuid, nb_dns_uuid)) {
-            sbrec_dns_delete(sbrec_dns);
-            continue;
-        }
-
         struct dns_info *dns_info =
-            get_dns_info_from_hmap(&dns_map, &dns_uuid);
+            get_dns_info_from_hmap(&dns_map, &sbrec_dns->header_.uuid);
         if (dns_info) {
             dns_info->sb_dns = sbrec_dns;
         } else {
@@ -18217,14 +18200,8 @@ sync_dns_entries(struct ovsdb_idl_txn *ovnsb_txn,
     struct dns_info *dns_info;
     HMAP_FOR_EACH_POP (dns_info, hmap_node, &dns_map) {
         if (!dns_info->sb_dns) {
-            sbrec_dns = sbrec_dns_insert(ovnsb_txn);
-            dns_info->sb_dns = sbrec_dns;
-            char *dns_id = xasprintf(
-                UUID_FMT, UUID_ARGS(&dns_info->nb_dns->header_.uuid));
-            const struct smap external_ids =
-                SMAP_CONST1(&external_ids, "dns_id", dns_id);
-            sbrec_dns_set_external_ids(sbrec_dns, &external_ids);
-            free(dns_id);
+            dns_info->sb_dns = sbrec_dns_insert_persist_uuid(
+                ovnsb_txn, &dns_info->nb_dns->header_.uuid);
         }
 
         /* Copy DNS options to SB*/
@@ -18273,37 +18250,37 @@ sync_template_vars(
     const struct nbrec_chassis_template_var_table *nbrec_ch_template_var_table,
     const struct sbrec_chassis_template_var_table *sbrec_ch_template_var_table)
 {
-    struct shash nb_tvs = SHASH_INITIALIZER(&nb_tvs);
-
     const struct nbrec_chassis_template_var *nb_tv;
     const struct sbrec_chassis_template_var *sb_tv;
 
-    NBREC_CHASSIS_TEMPLATE_VAR_TABLE_FOR_EACH (
-            nb_tv, nbrec_ch_template_var_table) {
-        shash_add(&nb_tvs, nb_tv->chassis, nb_tv);
-    }
-
     SBREC_CHASSIS_TEMPLATE_VAR_TABLE_FOR_EACH_SAFE (
             sb_tv, sbrec_ch_template_var_table) {
-        nb_tv = shash_find_and_delete(&nb_tvs, sb_tv->chassis);
+        nb_tv = nbrec_chassis_template_var_table_get_for_uuid(
+            nbrec_ch_template_var_table, &sb_tv->header_.uuid);
         if (!nb_tv) {
             sbrec_chassis_template_var_delete(sb_tv);
             continue;
         }
+
         if (!smap_equal(&sb_tv->variables, &nb_tv->variables)) {
-            sbrec_chassis_template_var_set_variables(sb_tv,
-                                                     &nb_tv->variables);
+            sbrec_chassis_template_var_set_variables(sb_tv, &nb_tv->variables);
         }
     }
 
-    struct shash_node *node;
-    SHASH_FOR_EACH (node, &nb_tvs) {
-        nb_tv = node->data;
-        sb_tv = sbrec_chassis_template_var_insert(ovnsb_txn);
+    NBREC_CHASSIS_TEMPLATE_VAR_TABLE_FOR_EACH (
+            nb_tv, nbrec_ch_template_var_table) {
+        const struct uuid *nb_uuid = &nb_tv->header_.uuid;
+        sb_tv = sbrec_chassis_template_var_table_get_for_uuid(
+            sbrec_ch_template_var_table, nb_uuid);
+        if (sb_tv) {
+            continue;
+        }
+
+        sb_tv = sbrec_chassis_template_var_insert_persist_uuid(ovnsb_txn,
+                                                               nb_uuid);
         sbrec_chassis_template_var_set_chassis(sb_tv, nb_tv->chassis);
         sbrec_chassis_template_var_set_variables(sb_tv, &nb_tv->variables);
     }
-    shash_destroy(&nb_tvs);
 }
 
 static void
@@ -18549,29 +18526,11 @@ build_mcast_groups(const struct sbrec_igmp_group_table *sbrec_igmp_group_table,
     }
 }
 
-static const struct nbrec_static_mac_binding *
-static_mac_binding_by_port_ip(
-    const struct nbrec_static_mac_binding_table *nbrec_static_mb_table,
-    const char *logical_port, const char *ip)
-{
-    const struct nbrec_static_mac_binding *nb_smb = NULL;
-
-    NBREC_STATIC_MAC_BINDING_TABLE_FOR_EACH (nb_smb, nbrec_static_mb_table) {
-        if (!strcmp(nb_smb->logical_port, logical_port) &&
-            !strcmp(nb_smb->ip, ip)) {
-            break;
-        }
-    }
-
-    return nb_smb;
-}
-
 static void
 build_static_mac_binding_table(
     struct ovsdb_idl_txn *ovnsb_txn,
     const struct nbrec_static_mac_binding_table *nbrec_static_mb_table,
     const struct sbrec_static_mac_binding_table *sbrec_static_mb_table,
-    struct ovsdb_idl_index *sbrec_static_mac_binding_by_lport_ip,
     struct hmap *lr_ports)
 {
     /* Cleanup SB Static_MAC_Binding entries which do not have corresponding
@@ -18581,9 +18540,8 @@ build_static_mac_binding_table(
     const struct sbrec_static_mac_binding *sb_smb;
     SBREC_STATIC_MAC_BINDING_TABLE_FOR_EACH_SAFE (sb_smb,
         sbrec_static_mb_table) {
-        nb_smb = static_mac_binding_by_port_ip(nbrec_static_mb_table,
-                                               sb_smb->logical_port,
-                                               sb_smb->ip);
+        nb_smb = nbrec_static_mac_binding_table_get_for_uuid(
+            nbrec_static_mb_table, &sb_smb->header_.uuid);
         if (!nb_smb) {
             sbrec_static_mac_binding_delete(sb_smb);
             continue;
@@ -18603,13 +18561,14 @@ build_static_mac_binding_table(
         if (op && op->nbrp) {
             struct ovn_datapath *od = op->od;
             if (od && od->sb) {
+                const struct uuid *nb_uuid = &nb_smb->header_.uuid;
                 const struct sbrec_static_mac_binding *mb =
-                    static_mac_binding_lookup(
-                        sbrec_static_mac_binding_by_lport_ip,
-                        nb_smb->logical_port, nb_smb->ip);
+                    sbrec_static_mac_binding_table_get_for_uuid(
+                        sbrec_static_mb_table, nb_uuid);
                 if (!mb) {
                     /* Create new entry */
-                    mb = sbrec_static_mac_binding_insert(ovnsb_txn);
+                    mb = sbrec_static_mac_binding_insert_persist_uuid(
+                        ovnsb_txn, nb_uuid);
                     sbrec_static_mac_binding_set_logical_port(
                         mb, nb_smb->logical_port);
                     sbrec_static_mac_binding_set_ip(mb, nb_smb->ip);
@@ -18889,7 +18848,6 @@ ovnnb_db_run(struct northd_input *input_data,
     build_static_mac_binding_table(ovnsb_txn,
         input_data->nbrec_static_mac_binding_table,
         input_data->sbrec_static_mac_binding_table,
-        input_data->sbrec_static_mac_binding_by_lport_ip,
         &data->lr_ports);
     stopwatch_stop(BUILD_LFLOWS_CTX_STOPWATCH_NAME, time_msec());
     stopwatch_start(CLEAR_LFLOWS_CTX_STOPWATCH_NAME, time_msec());
