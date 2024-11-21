@@ -6,6 +6,7 @@ Post v24.09.0
    - ovn-ic: Add support for route tag to prevent route learning.
    - Support for STT tunnels in ovn-encap-type is deprecated and will be
      removed in the next release.
+<<<<<<< HEAD
    - The LRP option 'centralize_routing' has been removed. The behavior is now
      enabled in all cases where it is needed.
    - The experimental logical router port options "routing-protocol-redirect"
@@ -28,6 +29,9 @@ Post v24.09.0
        this option was not set).  TLS ciphersuites for TLSv1.3 and later can
        be configured via --ssl-ciphersuites (--ssl-ciphers only applies to
        TLSv1.2 and earlier).
+   - Add concept of Transit Routers, the routers not allow CMS to specify
+     options:requested-chassis, if the chassis is remote the port will behave
+     as remote port.
 
 OVN v24.09.0 - 13 Sep 2024
 --------------------------
