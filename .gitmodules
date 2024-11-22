@@ -1,3 +1,4 @@
 [submodule "ovs"]
 	path = ovs
-	url = https://github.com/openvswitch/ovs.git
+	url = https://github.com/almusil/ovs.git
+        branch = netdev_increase
