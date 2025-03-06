@@ -89,6 +89,17 @@ struct fdb {
     long long timestamp;
 };
 
+struct mac_cache_stats {
+    int64_t idle_age_ms;
+
+    union {
+        /* Common data to identify MAC binding. */
+        struct mac_binding_data mb;
+        /* Common data to identify FDB. */
+        struct fdb_data fdb;
+    } data;
+};
+
 struct bp_packet_data {
     struct ovs_list node;
 

@@ -339,19 +339,6 @@ fdbs_clear(struct hmap *map)
     }
 }
 
-struct mac_cache_stats {
-    struct ovs_list list_node;
-
-    int64_t idle_age_ms;
-
-    union {
-        /* Common data to identify MAC binding. */
-        struct mac_binding_data mb;
-        /* Common data to identify FDB. */
-        struct fdb_data fdb;
-    } data;
-};
-
 /* MAC binding stat processing. */
 void
 mac_binding_stats_process_flow_stats(struct ovs_list *stats_list,
