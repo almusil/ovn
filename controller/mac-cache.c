@@ -18,6 +18,7 @@
 
 #include "lflow.h"
 #include "lib/mac-binding-index.h"
+#include "lib/vec.h"
 #include "local_data.h"
 #include "lport.h"
 #include "mac-cache.h"
@@ -341,28 +342,28 @@ fdbs_clear(struct hmap *map)
 
 /* MAC binding stat processing. */
 void
-mac_binding_stats_process_flow_stats(struct ovs_list *stats_list,
+mac_binding_stats_process_flow_stats(struct vector *stats_vec,
                                      struct ofputil_flow_stats *ofp_stats)
 {
-    struct mac_cache_stats *stats = xmalloc(sizeof *stats);
-
-    stats->idle_age_ms = ofp_stats->idle_age * 1000;
-    stats->data.mb = (struct mac_binding_data) {
-        .cookie = ntohll(ofp_stats->cookie),
-        /* The port_key must be zero to match mac_binding_data_from_sbrec. */
-        .port_key = 0,
-        .dp_key = ntohll(ofp_stats->match.flow.metadata),
-        .mac = ofp_stats->match.flow.dl_src
+    struct mac_cache_stats stats = (struct mac_cache_stats) {
+        .idle_age_ms = ofp_stats->idle_age * 1000,
+        .data.mb = (struct mac_binding_data) {
+            .cookie = ntohll(ofp_stats->cookie),
+            /* The port_key must be zero to match
+             * mac_binding_data_from_sbrec. */
+            .port_key = 0,
+            .dp_key = ntohll(ofp_stats->match.flow.metadata),
+            .mac = ofp_stats->match.flow.dl_src
+        },
     };
 
     if (ofp_stats->match.flow.dl_type == htons(ETH_TYPE_IP) ||
         ofp_stats->match.flow.dl_type == htons(ETH_TYPE_ARP)) {
-        stats->data.mb.ip = in6_addr_mapped_ipv4(ofp_stats->match.flow.nw_src);
+        stats.data.mb.ip = in6_addr_mapped_ipv4(ofp_stats->match.flow.nw_src);
     } else {
-        stats->data.mb.ip = ofp_stats->match.flow.ipv6_src;
+        stats.data.mb.ip = ofp_stats->match.flow.ipv6_src;
     }
-
-    ovs_list_push_back(stats_list, &stats->list_node);
+    vector_push(stats_vec, &stats);
 }
 
 static void
@@ -396,19 +397,18 @@ void
 mac_binding_stats_run(
         struct rconn *swconn OVS_UNUSED,
         struct ovsdb_idl_index *sbrec_port_binding_by_name OVS_UNUSED,
-        struct ovs_list *stats_list, uint64_t *req_delay, void *data)
+        struct vector *stats_vec, uint64_t *req_delay, void *data)
 {
     struct mac_cache_data *cache_data = data;
     long long timewall_now = time_wall_msec();
 
-    struct mac_cache_stats *stats;
-    LIST_FOR_EACH_POP (stats, list_node, stats_list) {
+    struct mac_cache_stats stats;
+    VECTOR_FOR_EACH_POP (stats_vec, stats) {
         struct mac_binding *mb = mac_binding_find(&cache_data->mac_bindings,
-                                                  &stats->data.mb);
+                                                  &stats.data.mb);
         if (!mb) {
-            mac_binding_update_log("Not found in the cache:", &stats->data.mb,
+            mac_binding_update_log("Not found in the cache:", &stats.data.mb,
                                    false, NULL, 0, 0);
-            free(stats);
             continue;
         }
 
@@ -418,25 +418,24 @@ mac_binding_stats_run(
 
         /* If "idle_age" is under threshold it means that the mac binding is
          * used on this chassis. */
-        if (stats->idle_age_ms < threshold->value) {
+        if (stats.idle_age_ms < threshold->value) {
             if (since_updated_ms >= threshold->cooldown_period) {
                 mac_binding_update_log("Updating active", &mb->data, true,
-                                       threshold, stats->idle_age_ms,
+                                       threshold, stats.idle_age_ms,
                                        since_updated_ms);
                 sbrec_mac_binding_set_timestamp(mb->sbrec, timewall_now);
             } else {
                 /* Postponing the update to avoid sending database transactions
                  * too frequently. */
                 mac_binding_update_log("Not updating active", &mb->data, true,
-                                       threshold, stats->idle_age_ms,
+                                       threshold, stats.idle_age_ms,
                                        since_updated_ms);
             }
         } else {
             mac_binding_update_log("Not updating non-active", &mb->data, true,
-                                   threshold, stats->idle_age_ms,
+                                   threshold, stats.idle_age_ms,
                                    since_updated_ms);
         }
-        free(stats);
     }
 
     mac_cache_update_req_delay(&cache_data->thresholds, req_delay);
@@ -447,19 +446,18 @@ mac_binding_stats_run(
 
 /* FDB stat processing. */
 void
-fdb_stats_process_flow_stats(struct ovs_list *stats_list,
+fdb_stats_process_flow_stats(struct vector *stats_vec,
                              struct ofputil_flow_stats *ofp_stats)
 {
-    struct mac_cache_stats *stats = xmalloc(sizeof *stats);
-
-    stats->idle_age_ms = ofp_stats->idle_age * 1000;
-    stats->data.fdb = (struct fdb_data) {
+    struct mac_cache_stats stats = (struct mac_cache_stats) {
+        .idle_age_ms = ofp_stats->idle_age * 1000,
+        .data.fdb = (struct fdb_data) {
             .port_key = ofp_stats->match.flow.regs[MFF_LOG_INPORT - MFF_REG0],
             .dp_key = ntohll(ofp_stats->match.flow.metadata),
             .mac = ofp_stats->match.flow.dl_src
+        },
     };
-
-    ovs_list_push_back(stats_list, &stats->list_node);
+    vector_push(stats_vec, &stats);
 }
 
 static void
@@ -493,20 +491,19 @@ fdb_update_log(const char *action,
 void
 fdb_stats_run(struct rconn *swconn OVS_UNUSED,
               struct ovsdb_idl_index *sbrec_port_binding_by_name OVS_UNUSED,
-              struct ovs_list *stats_list,
+              struct vector *stats_vec,
               uint64_t *req_delay, void *data)
 {
     struct mac_cache_data *cache_data = data;
     long long timewall_now = time_wall_msec();
 
-    struct mac_cache_stats *stats;
-    LIST_FOR_EACH_POP (stats, list_node, stats_list) {
-        struct fdb *fdb = fdb_find(&cache_data->fdbs, &stats->data.fdb);
+    struct mac_cache_stats stats;
+    VECTOR_FOR_EACH_POP (stats_vec, stats) {
+        struct fdb *fdb = fdb_find(&cache_data->fdbs, &stats.data.fdb);
 
         if (!fdb) {
-            fdb_update_log("Not found in the cache:", &stats->data.fdb,
+            fdb_update_log("Not found in the cache:", &stats.data.fdb,
                            false, NULL, 0, 0);
-            free(stats);
             continue;
         }
 
@@ -516,25 +513,23 @@ fdb_stats_run(struct rconn *swconn OVS_UNUSED,
 
         /* If "idle_age" is under threshold it means that the fdb entry is
          * used on this chassis. */
-        if (stats->idle_age_ms < threshold->value) {
+        if (stats.idle_age_ms < threshold->value) {
             if (since_updated_ms >= threshold->cooldown_period) {
                 fdb_update_log("Updating active", &fdb->data, true,
-                               threshold, stats->idle_age_ms,
+                               threshold, stats.idle_age_ms,
                                since_updated_ms);
                 sbrec_fdb_set_timestamp(fdb->sbrec_fdb, timewall_now);
             } else {
                 /* Postponing the update to avoid sending database transactions
                  * too frequently. */
                 fdb_update_log("Not updating active", &fdb->data, true,
-                               threshold, stats->idle_age_ms,
+                               threshold, stats.idle_age_ms,
                                since_updated_ms);
             }
         } else {
             fdb_update_log("Not updating non-active", &fdb->data, true,
-                           threshold, stats->idle_age_ms, since_updated_ms);
+                           threshold, stats.idle_age_ms, since_updated_ms);
         }
-
-        free(stats);
     }
 
     mac_cache_update_req_delay(&cache_data->thresholds, req_delay);
@@ -694,16 +689,6 @@ buffered_packets_ctx_destroy(struct buffered_packets_ctx *ctx) {
     hmap_destroy(&ctx->buffered_packets);
 }
 
-
-void
-mac_cache_stats_destroy(struct ovs_list *stats_list)
-{
-    struct mac_cache_stats *stats;
-    LIST_FOR_EACH_POP (stats, list_node, stats_list) {
-        free(stats);
-    }
-}
-
 static uint32_t
 mac_binding_data_hash(const struct mac_binding_data *mb_data)
 {
@@ -848,48 +833,49 @@ buffered_packets_db_lookup(struct buffered_packets *bp, struct ds *ip,
 
 void
 mac_binding_probe_stats_process_flow_stats(
-        struct ovs_list *stats_list,
+        struct vector *stats_vec,
         struct ofputil_flow_stats *ofp_stats)
 {
-    struct mac_cache_stats *stats = xmalloc(sizeof *stats);
-
-    stats->idle_age_ms = ofp_stats->idle_age * 1000;
-    stats->data.mb = (struct mac_binding_data) {
-        .cookie = ntohll(ofp_stats->cookie),
-        /* The port_key must be zero to match mac_binding_data_from_sbrec. */
-        .port_key = 0,
-        .dp_key = ntohll(ofp_stats->match.flow.metadata),
+    struct mac_cache_stats stats = (struct mac_cache_stats) {
+        .idle_age_ms = ofp_stats->idle_age * 1000,
+        .data.mb = (struct mac_binding_data) {
+            .cookie = ntohll(ofp_stats->cookie),
+            /* The port_key must be zero to match
+             * mac_binding_data_from_sbrec. */
+            .port_key = 0,
+            .dp_key = ntohll(ofp_stats->match.flow.metadata),
+            .mac = ofp_stats->match.flow.dl_src
+        },
     };
 
     if (ofp_stats->match.flow.regs[0]) {
-        stats->data.mb.ip =
+        stats.data.mb.ip =
             in6_addr_mapped_ipv4(htonl(ofp_stats->match.flow.regs[0]));
     } else {
         ovs_be128 ip6 = hton128(flow_get_xxreg(&ofp_stats->match.flow, 1));
-        memcpy(&stats->data.mb.ip, &ip6, sizeof stats->data.mb.ip);
+        memcpy(&stats.data.mb.ip, &ip6, sizeof stats.data.mb.ip);
     }
 
-    ovs_list_push_back(stats_list, &stats->list_node);
+    vector_push(stats_vec, &stats);
 }
 
 void
 mac_binding_probe_stats_run(
         struct rconn *swconn,
         struct ovsdb_idl_index *sbrec_port_binding_by_name,
-        struct ovs_list *stats_list,
+        struct vector *stats_vec,
         uint64_t *req_delay, void *data)
 {
     long long timewall_now = time_wall_msec();
     struct mac_cache_data *cache_data = data;
 
-    struct mac_cache_stats *stats;
-    LIST_FOR_EACH_POP (stats, list_node, stats_list) {
+    struct mac_cache_stats stats;
+    VECTOR_FOR_EACH_POP (stats_vec, stats) {
         struct mac_binding *mb = mac_binding_find(&cache_data->mac_bindings,
-                                                  &stats->data.mb);
+                                                  &stats.data.mb);
         if (!mb) {
             mac_binding_update_log("Probe: not found in the cache:",
-                                   &stats->data.mb, false, NULL, 0, 0);
-            free(stats);
+                                   &stats.data.mb, false, NULL, 0, 0);
             continue;
         }
 
@@ -898,20 +884,18 @@ mac_binding_probe_stats_run(
         uint64_t since_updated_ms = timewall_now - mb->sbrec->timestamp;
         const struct sbrec_mac_binding *sbrec = mb->sbrec;
 
-        if (stats->idle_age_ms > threshold->value) {
+        if (stats.idle_age_ms > threshold->value) {
             mac_binding_update_log("Not sending ARP/ND request for non-active",
                                    &mb->data, true, threshold,
-                                   stats->idle_age_ms, since_updated_ms);
-            free(stats);
+                                   stats.idle_age_ms, since_updated_ms);
             continue;
         }
 
         if (since_updated_ms < threshold->cooldown_period) {
             mac_binding_update_log(
                     "Not sending ARP/ND request for recently updated",
-                    &mb->data, true, threshold, stats->idle_age_ms,
+                    &mb->data, true, threshold, stats.idle_age_ms,
                     since_updated_ms);
-            free(stats);
             continue;
         }
 
@@ -919,13 +903,11 @@ mac_binding_probe_stats_run(
             lport_lookup_by_name(sbrec_port_binding_by_name,
                                  sbrec->logical_port);
         if (!pb) {
-            free(stats);
             continue;
         }
 
         struct lport_addresses laddr;
         if (!extract_lsp_addresses(pb->mac[0], &laddr)) {
-            free(stats);
             continue;
         }
 
@@ -936,7 +918,7 @@ mac_binding_probe_stats_run(
 
             mac_binding_update_log("Sending ARP/ND request for active",
                                    &mb->data, true, threshold,
-                                   stats->idle_age_ms, since_updated_ms);
+                                   stats.idle_age_ms, since_updated_ms);
 
             send_self_originated_neigh_packet(swconn,
                                               sbrec->datapath->tunnel_key,
@@ -945,7 +927,6 @@ mac_binding_probe_stats_run(
                                               OFTABLE_LOCAL_OUTPUT);
         }
 
-        free(stats);
         destroy_lport_addresses(&laddr);
     }
 
