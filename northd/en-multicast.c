@@ -332,8 +332,8 @@ build_mcast_groups(struct multicast_igmp_data *data,
          * The router IGMP groups are based on the groups learnt by their
          * multicast enabled peers.
          */
-        for (size_t i = 0; i < od->n_router_ports; i++) {
-            struct ovn_port *router_port = od->router_ports[i]->peer;
+        VECTOR_FOR_EACH (&od->router_ports, op) {
+            struct ovn_port *router_port = op->peer;
 
             /* If the router the port connects to doesn't have multicast
              * relay enabled or if it was already configured to flood
@@ -716,11 +716,11 @@ ovn_igmp_group_aggregate_ports(struct ovn_igmp_group *igmp_group,
         free(entry);
     }
 
-    if (igmp_group->datapath->n_localnet_ports) {
+    if (!vector_is_empty(&igmp_group->datapath->localnet_ports)) {
         ovn_multicast_add_ports(mcast_groups, igmp_group->datapath,
-                                &igmp_group->mcgroup,
-                                igmp_group->datapath->localnet_ports,
-                                igmp_group->datapath->n_localnet_ports);
+            &igmp_group->mcgroup,
+            vector_to_array(&igmp_group->datapath->localnet_ports),
+            vector_len(&igmp_group->datapath->localnet_ports));
     }
 }
 
