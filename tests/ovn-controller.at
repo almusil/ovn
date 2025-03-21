@@ -2303,6 +2303,8 @@ for i in $(seq 10); do
     OVS_WAIT_UNTIL([test $(as hv1 ovs-ofctl dump-flows br-int table=$acl_eval | grep -c "priority=1100") = "$(($i + 1))"])
 done
 
+check false
+
 # Resume northd to be able to properly cleanup
 check as northd ovn-appctl -t ovn-northd resume
 OVN_CLEANUP([hv1])

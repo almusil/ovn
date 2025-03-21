@@ -30995,6 +30995,8 @@ check ovn-nbctl --wait=hv acl-del ls1 to-lport 1001 \
 test_ip 2 f00000000002 f00000000001 $sip $dip
 OVN_CHECK_PACKETS([hv1/vif1-tx.pcap], [1.expected])
 
+check false
+
 OVN_CLEANUP([hv1])
 AT_CLEANUP
 
