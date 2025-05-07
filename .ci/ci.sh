@@ -97,6 +97,8 @@ function overwrite_jobs() {
 
 function run_tests() {
     container_exec "
+        cat /etc/hosts \
+        && \
         cd $CONTAINER_WORKDIR \
         && \
         ARCH=$ARCH CC=$CC LIBS=$LIBS OPTS=$OPTS TESTSUITE=$TESTSUITE \

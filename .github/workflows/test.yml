@@ -48,12 +48,12 @@ jobs:
           echo "IMAGE_DISTRO=fedora" >> $GITHUB_ENV
 
       - name: Build container
-        if: github.ref_name != 'main'
+        if: github.ref_name != 'ci-test'
         run: make ${{ env.IMAGE_DISTRO }}
         working-directory: utilities/containers
 
       - name: Download container
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'ci-test'
         run: podman pull ghcr.io/ovn-org/ovn-tests:${{ env.IMAGE_DISTRO }}
 
       - name: Tag image
@@ -112,6 +112,10 @@ jobs:
         - { arch: x86, compiler: gcc, opts: --disable-ssl }
 
     steps:
+    - name: hosts
+      run: |
+        cat /etc/hosts
+
     - name: system-level-dependencies
       if: ${{ startsWith(matrix.cfg.testsuite, 'system-test') }}
       run: |
