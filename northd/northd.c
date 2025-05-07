@@ -6866,10 +6866,8 @@ build_acl_log_related_flows(const struct ovn_datapath *od,
         S_SWITCH_OUT_ACL_EVAL :
         S_SWITCH_IN_ACL_EVAL;
     ds_clear(match);
-    ds_put_format(match, "ct.est && !ct.rel && !ct.new%s && "
-                  "ct.rpl && %s == 0 && "
+    ds_put_format(match, "ct.est && !ct.rel && ct.rpl && %s == 0 && "
                   "ct_label.label == %" PRId64,
-                  use_ct_inv_match ? " && !ct.inv" : "",
                   ct_blocked_match, acl->label);
     ovn_lflow_add_with_hint(lflows, od, log_related_stage,
                             UINT16_MAX - 2,
@@ -6877,11 +6875,10 @@ build_acl_log_related_flows(const struct ovn_datapath *od,
                             &acl->header_, lflow_ref);
 
     ds_clear(match);
-    ds_put_format(match, "!ct.est && ct.rel && !ct.new%s && "
+    ds_put_format(match, "!ct.est && ct.rel && !ct.new && "
                          "%s == 0 && "
                          "ct_label.label == %" PRId64,
-                         use_ct_inv_match ? " && !ct.inv" : "",
-                         ct_blocked_match, acl->label);
+                  ct_blocked_match, acl->label);
     ovn_lflow_add_with_hint(lflows, od, log_related_stage,
                             UINT16_MAX - 2,
                             ds_cstr(match), ds_cstr(actions),
@@ -7006,9 +7003,7 @@ build_acls(const struct ls_stateful_record *ls_stateful_rec,
          *
          * This is enforced at a higher priority than ACLs can be defined. */
         ds_clear(&match);
-        ds_put_format(&match, "ct.est && !ct.rel && !ct.new%s && "
-                      "ct.rpl && %s == 0",
-                      use_ct_inv_match ? " && !ct.inv" : "",
+        ds_put_format(&match, "ct.est && !ct.rel && ct.rpl && %s == 0",
                       ct_blocked_match);
         ovn_lflow_add(lflows, od, S_SWITCH_IN_ACL_EVAL, UINT16_MAX - 3,
                       ds_cstr(&match), REGBIT_ACL_HINT_DROP" = 0; "
@@ -7044,8 +7039,7 @@ build_acls(const struct ls_stateful_record *ls_stateful_rec,
             ? REGBIT_ACL_VERDICT_ALLOW" = 1; ct_commit_nat;"
             : REGBIT_ACL_VERDICT_ALLOW" = 1; next;";
         ds_clear(&match);
-        ds_put_format(&match, "!ct.est && ct.rel && !ct.new%s && %s == 0",
-                      use_ct_inv_match ? " && !ct.inv" : "",
+        ds_put_format(&match, "!ct.est && ct.rel && !ct.new && %s == 0",
                       ct_blocked_match);
         ovn_lflow_add(lflows, od, S_SWITCH_IN_ACL_EVAL, UINT16_MAX - 3,
                       ds_cstr(&match), ct_in_acl_action, lflow_ref);
