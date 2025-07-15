@@ -79,6 +79,7 @@ podman exec $h1 ovs-vsctl set open . external-ids:ovn-bridge-mappings=phys:br-ex
 podman exec $h1 ovs-vsctl add-port br-ex $eth
 podman exec $h1 ip addr add 20.0.0.1/8 dev br-ex
 podman exec $h1 ip link set up br-ex
+podman exec $h1 ovs-vsctl set open . external_ids:ovn-evpn-local-ip="20.0.0.1"
 
 # Add internal switch.
 podman exec $h1 ovn-nbctl ls-add ls-int
@@ -100,6 +101,7 @@ podman exec $h1 ip netns exec workload ip a a dev workload 42.42.1.15/16
 podman exec $h1 ip netns exec workload ip link set dev workload up
 podman exec $h1 ovn-nbctl lsp-add ls-ext workload \
   -- lsp-set-addresses workload "00:00:00:00:01:42 42.42.1.15/16"
+podman exec $h1 ovn-nbctl set logical-switch ls-ext other_config:dynamic-routing-vni=10
 
 echo Sleeping for a bit...
 sleep 5
@@ -317,8 +319,25 @@ for vni in 10 20; do
     echo
 done
 
+podman exec $h2 ip netns add workload
+podman exec $h2 ip link add workload-pair type veth peer workload
+podman exec $h2 ip link set netns workload dev workload
+podman exec $h2 ip link set workload-pair up
+podman exec $h2 ip link set workload-pair master br-10
+podman exec $h2 ip netns exec workload ip addr add 42.42.2.50/16 dev workload
+podman exec $h2 ip netns exec workload ip link set workload up
+
 sleep infinity
 
 # TODO: when L2 EVPN is supported the following ping (to host2/3) should succeed!!
 podman exec $h1 ip netns exec workload ping -c1 42.42.2.10
 podman exec $h1 ip netns exec workload ping -c1 42.42.3.10
+
+# OF
+dp_key=$(podman exec $h1 ovn-sbctl --bare --columns tunnel_key find datapath external_ids:name="ls-ext")
+pb_key=$(podman exec $h1 ovn-sbctl --bare --columns tunnel_key find port_binding logical_port="workload")
+tunnel_ofport=$(podman exec $h1 ovs-vsctl --bare --columns ofport find interface name="vxlan-ovs")
+podman exec $h1 ovs-ofctl add-flow br-int "priority=1000,table=37,metadata=$pb_key,reg14=$dp_key actions=set_field:20.0.0.1->tun_src,set_field:10->tun_id,set_field:20.0.0.2->tun_dst,output:$tunnel_ofport"
+podman exec $h1 ovs-ofctl add-flow br-int "priority=1000,table=0,in_port=$tunnel_ofport,tun_src=20.0.0.2,tun_dst=20.0.0.1,tun_id=10 actions=set_field:$dp_key->metadata,resubmit(,8)"
+# ovs-ofctl add-flow br-int "table=43,priority=1000,reg10=0/0x2,reg15=0x8000,metadata=0x2,actions=set_field:0->reg6,set_field:0x80000002->reg15,resubmit(,44)"
+# ovs-ofctl add-flow br-int "table=71,priority=1200,metadata=0x2,actions=set_field:0x80000006->reg15"
