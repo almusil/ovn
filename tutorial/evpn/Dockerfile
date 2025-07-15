@@ -46,11 +46,13 @@ tcpdump \
 uuid.x86_64 \
 which  \
 initscripts \
-systemd
+systemd \
+strace
 
 ARG OVN_PATH
 
-RUN git clone https://github.com/dceara/ovn --single-branch --revision bgp-evpn-hacking --depth 1
+COPY ./ovn /ovn
+#RUN git clone https://github.com/almusil/ovn --single-branch --revision bgp-evpn --depth 1
 
 WORKDIR /ovn
 RUN git submodule update --init --depth 1
