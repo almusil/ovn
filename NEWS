@@ -36,6 +36,14 @@ Post v25.03.0
    - Added a new ACL option "--all" to "acl-list" command. When set,
      "acl-list" command will also list port groups ACLs associated with
      each port of the target logical switch.
+   - Dynamic Routing:
+     * Add the option "dynamic-routing-vni" to Logical Switches. If set to true
+       static and connected routes matching the filter below are shared to the
+       southbound "Advertised_Route" table for sharing outside of OVN.
+       The routes can further be configured by setting
+       `dynamic-routing-redistribute` on the LR or LRP. The LRP settings
+       overwrite the LR settings for all routes using this interface to
+       forward traffic on.
 
 OVN v25.03.0 - 07 Mar 2025
 --------------------------

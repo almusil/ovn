@@ -866,6 +866,21 @@
         dropped, even if use_ct_inv_match is set to true.
         Default: <code>false</code>.
       </column>
+
+      <column name="other_config" key="dynamic-routing-vni"
+              type='{"type": "integer", "minInteger": 0,
+                     "maxInteger": 16777215}'>
+        <p>
+          This defines the vni number associated with EVPN domain that the
+          Logical Switch is supposed to connect to.
+        </p>
+
+        <p>
+          The ovn-controller expects three interfaces to exist within the
+          BGP vrf: <code>br-$vi</code>, <code>lo-$vni</code> and
+          <code>vxlan-$vni</code>.
+        </p>
+      </column>
     </group>
 
     <group title="IP Multicast Snooping Options">
