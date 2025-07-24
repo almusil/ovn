@@ -829,6 +829,10 @@ ovn_datapath_update_external_ids(struct ovn_datapath *od)
             const char *vni = smap_get(&od->nbs->other_config,
                                        "dynamic-routing-vni");
             smap_add(&ids, "dynamic-routing-vni", vni);
+            smap_add(&ids, "dynamic-routing-advertise-fdb",
+                     drr_mode_FDB_is_set(od->dynamic_routing_redistribute)
+                     ? "true"
+                     : "false");
         }
     }
 
@@ -904,6 +908,10 @@ parse_dynamic_routing_redistribute(
         }
         if (!strcmp(token, "lb")) {
             out |= DRRM_LB;
+            continue;
+        }
+        if (!strcmp(token, "fdb")) {
+            out |= DRRM_FDB;
             continue;
         }
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 1);
@@ -991,6 +999,10 @@ join_datapaths(const struct nbrec_logical_switch_table *nbrec_ls_table,
         if (ovn_is_valid_vni(vni)) {
             od->has_evpn_vni = true;
         }
+
+        od->dynamic_routing_redistribute =
+            parse_dynamic_routing_redistribute(&od->nbs->other_config,
+                                               DRRM_NONE, od->nbs->name);
     }
 
     const struct nbrec_logical_router *nbr;
