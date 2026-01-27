@@ -688,7 +688,7 @@ should_advertise_route(const struct uuidset *host_route_lrps,
 static bool
 advertise_routes_as_host_prefix(
     struct advertised_route_sync_data *data,
-    struct uuidset *host_route_lrps,
+    struct uuidset *host_route_lrps OVS_UNUSED,
     struct hmap *sync_routes,
     const struct hmap *ls_ports,
     const struct ovn_datapath *advertising_od,
@@ -706,7 +706,7 @@ advertise_routes_as_host_prefix(
         return false;
     }
 
-    uuidset_insert(host_route_lrps, &advertising_op->nbrp->header_.uuid);
+    // uuidset_insert(host_route_lrps, &advertising_op->nbrp->header_.uuid);
     publish_host_routes(sync_routes, ls_ports, advertising_od,
                         advertising_op, data);
     return true;
