@@ -2809,6 +2809,10 @@ build_out_port_sec_no_ip_flows(const struct sbrec_port_binding *pb,
                                struct match *m, struct ofpbuf *ofpacts,
                                struct ovn_desired_flow_table *flow_table)
 {
+    if (ps_addr->n_ipv4_addrs || ps_addr->n_ipv6_addrs) {
+        return;
+    }
+
     /* Add the below logical flow equivalent OF rules in 'out_port_sec' table.
      * priority: 85
      * match - "outport == pb->logical_port && eth.dst == ps_addr.ea"
@@ -2829,30 +2833,6 @@ build_out_port_sec_ip4_flows(const struct sbrec_port_binding *pb,
                             struct match *m, struct ofpbuf *ofpacts,
                             struct ovn_desired_flow_table *flow_table)
 {
-    if (!ps_addr->n_ipv4_addrs && !ps_addr->n_ipv6_addrs) {
-         /* No IPv4 and no IPv6 addresses in the port security.
-          * Both IPv4 and IPv6 traffic should be delivered to the
-          * lport. build_out_port_sec_no_ip_flows() takes care of
-          * adding the required flow(s) to allow. */
-        return;
-    }
-
-    /* Add the below logical flow equivalent OF rules in 'out_port_sec' table.
-     * priority: 90
-     * match - "outport == pb->logical_port && eth.dst == ps_addr.ea && ip4"
-     * action - "port_sec_failed = 1;"
-     * description: Default drop IPv4 packets.  If IPv4 addresses are
-     *              configured, then higher priority flows are added
-     *              to allow specific IPv4 packets.
-     */
-    reset_match_for_port_sec_flows(pb, MFF_LOG_OUTPORT, m);
-    match_set_dl_dst(m, ps_addr->ea);
-    match_set_dl_type(m, htons(ETH_TYPE_IP));
-    build_port_sec_deny_action(ofpacts);
-    ofctrl_add_flow(flow_table, OFTABLE_CHK_OUT_PORT_SEC, 90,
-                    pb->header_.uuid.parts[0], m, ofpacts,
-                    &pb->header_.uuid);
-
     if (!ps_addr->n_ipv4_addrs) {
         return;
     }
@@ -2927,30 +2907,6 @@ build_out_port_sec_ip6_flows(const struct sbrec_port_binding *pb,
                             struct match *m, struct ofpbuf *ofpacts,
                             struct ovn_desired_flow_table *flow_table)
 {
-    if (!ps_addr->n_ipv4_addrs && !ps_addr->n_ipv6_addrs) {
-        /* No IPv4 and no IPv6 addresses in the port security.
-         * Both IPv4 and IPv6 traffic should be delivered to the
-         * lport. build_out_port_sec_no_ip_flows() takes care of
-         * adding the required flow(s) to allow. */
-        return;
-    }
-
-    /* Add the below logical flow equivalent OF rules in 'out_port_sec' table.
-     * priority: 90
-     * match - "outport == pb->logical_port && eth.dst == ps_addr.ea && ip6"
-     * action - "port_sec_failed = 1;"
-     * description: Default drop IPv6 packets.  If IPv6 addresses are
-     *              configured, then higher priority flows are added
-     *              to allow specific IPv6 packets.
-     */
-    reset_match_for_port_sec_flows(pb, MFF_LOG_OUTPORT, m);
-    match_set_dl_dst(m, ps_addr->ea);
-    match_set_dl_type(m, htons(ETH_TYPE_IPV6));
-    build_port_sec_deny_action(ofpacts);
-    ofctrl_add_flow(flow_table, OFTABLE_CHK_OUT_PORT_SEC, 90,
-                    pb->header_.uuid.parts[0], m, ofpacts,
-                    &pb->header_.uuid);
-
     if (!ps_addr->n_ipv6_addrs) {
         return;
     }
