@@ -91,6 +91,7 @@ function copy_sources_to_workdir() {
 }
 
 function run_tests() {
+    container_exec "tee --version"
     container_exec "
         cd $CONTAINER_WORKDIR \
         && \
