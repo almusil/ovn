@@ -22,6 +22,17 @@ m4_define([OVN_IC_SBCTL_TEST_STOP],
 
 dnl ---------------------------------------------------------------------
 
+AT_SETUP([ovn-ic-sbctl - show-table])
+OVN_IC_SBCTL_TEST_START
+AT_CHECK([ovn-ic-sbctl create Availability_Zone name=az-show > uuid])
+AT_CHECK([ovn-ic-sbctl show-table Availability_Zone az-show > actual])
+AT_CHECK([ovn-ic-sbctl list Availability_Zone az-show > expected])
+AT_CHECK([diff -u expected actual])
+AT_CHECK([ovn-ic-sbctl --all show-table Availability_Zone az-show > actual])
+AT_CHECK([diff -u expected actual])
+OVN_IC_SBCTL_TEST_STOP
+AT_CLEANUP
+
 AT_SETUP([ovn-ic-sbctl])
 OVN_IC_SBCTL_TEST_START
 

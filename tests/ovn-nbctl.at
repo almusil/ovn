@@ -53,6 +53,107 @@ m4_define([OVN_NBCTL_TEST],
     OVN_NBCTL_TEST_STOP
     AT_CLEANUP])
 
+OVN_NBCTL_TEST([ovn_nbctl_show_table], [show-table], [
+check ovn-nbctl ls-add sw
+check ovn-nbctl lsp-add sw 'port one'
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw > actual])
+AT_CHECK([ovn-nbctl list Logical_Switch sw > expected])
+dnl Only schema references differ from list output by default.
+AT_CHECK([sed '/^ports /d' actual > actual-root
+          sed '/^ports /d' expected > expected-root
+          diff -u expected-root actual-root])
+AT_CHECK([grep '^ports ' actual], [0], [dnl
+ports               : [["port one"]]
+])
+AT_CHECK([ovn-nbctl --all show-table Logical_Switch sw > expanded])
+AT_CHECK([grep '^    name ' expanded], [0], [dnl
+    name                : "port one"
+])
+AT_CHECK([grep '^    addresses ' expanded], [0], [dnl
+    addresses           : [[]]
+])
+AT_CHECK([grep -c '_uuid ' expanded], [0], [dnl
+2
+])
+AT_CHECK([ovn-nbctl show-table logical-switch sw > alias-output])
+AT_CHECK([cmp actual alias-output])
+AT_CHECK([ovn-nbctl get Logical_Switch sw _uuid > switch-uuid])
+AT_CHECK([ovn-nbctl show-table Logical_Switch $(cut -c1-8 switch-uuid) > by-prefix])
+AT_CHECK([cmp actual by-prefix])
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw -- show-table Logical_Switch sw > repeated])
+AT_CHECK([cat actual actual > expected; diff -u expected repeated])
+AT_CHECK([ovn-nbctl --all show-table Logical_Switch sw -- show-table Logical_Switch sw > mixed])
+AT_CHECK([cat expanded actual > expected; diff -u expected mixed])
+AT_CHECK([ovn-nbctl show-table No_Such_Table sw], [1], [], [dnl
+ovn-nbctl: unknown table "No_Such_Table"
+])
+AT_CHECK([ovn-nbctl show-table Logical_Switch missing], [1], [], [dnl
+ovn-nbctl: no row "missing" in table Logical_Switch
+])
+AT_CHECK([ovn-nbctl show-table Logical_Switch], [1], [], [ignore])
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw extra], [1], [], [ignore])
+AT_CHECK([ovn-nbctl show-table Logical sw], [1], [], [ignore])
+AT_CHECK([ovn-nbctl --format=json show-table Logical_Switch sw], [1], [], [dnl
+ovn-nbctl: show-table requires list format, string data, and headings
+])
+
+dnl Shared grandchildren must be expanded under both referring ports.
+check ovn-nbctl lsp-add sw p2
+AT_CHECK([ovn-nbctl --id=@d create DHCP_Options cidr=192.0.2.0/24 -- set Logical_Switch_Port 'port one' dhcpv4_options=@d -- set Logical_Switch_Port p2 dhcpv4_options=@d > dhcp-uuid])
+AT_CHECK([ovn-nbctl --all show-table Logical_Switch sw > expanded])
+AT_CHECK([grep -c '^        cidr *: "192.0.2.0/24"$' expanded], [0], [dnl
+2
+])
+AT_CHECK([grep -c '^    ----$' expanded], [0], [dnl
+1
+])
+AT_CHECK([grep -c '_uuid ' expanded], [0], [dnl
+5
+])
+AT_CHECK([ovn-nbctl show-table DHCP_Options 'port one' > indirect])
+AT_CHECK([ovn-nbctl show-table DHCP_Options $(cat dhcp-uuid) > by-uuid])
+AT_CHECK([cmp indirect by-uuid])
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw > actual])
+AT_CHECK([grep -c '_uuid ' actual], [0], [dnl
+1
+])
+
+dnl An absent or empty optional name is not a printable identity.
+check ovn-nbctl acl-add sw to-lport 10 ip4 drop
+AT_CHECK([ovn-nbctl get Logical_Switch sw acls > acl-uuid])
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw > actual])
+AT_CHECK([grep '^acls ' actual | sed 's/^.*: //' > acl-value
+          cmp acl-uuid acl-value])
+check ovn-nbctl set ACL $(tr -d '\133\135' < acl-uuid) 'name=""'
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw > actual])
+AT_CHECK([grep '^acls ' actual | sed 's/^.*: //' > acl-value
+          cmp acl-uuid acl-value])
+check ovn-nbctl set ACL $(tr -d '\133\135' < acl-uuid) 'name="named acl"'
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw | grep '^acls '], [0], [dnl
+acls                : [["named acl"]]
+])
+AT_CHECK([ovn-nbctl --all show-table Logical_Switch sw > expanded])
+AT_CHECK([grep '^acls ' expanded | sed 's/^.*: //' > acl-value
+          cmp acl-uuid acl-value])
+
+dnl A configured record identifier is not a child display name.
+AT_CHECK([ovn-nbctl --id=@c create Connection 'target="tcp:192.0.2.1:6641"' -- set NB_Global . connections=@c > connection-uuid])
+AT_CHECK([ovn-nbctl get NB_Global . connections > connection-set])
+AT_CHECK([ovn-nbctl show-table NB_Global . > global])
+AT_CHECK([grep '^connections ' global | sed 's/^.*: //' > connection-value
+          cmp connection-set connection-value])
+
+dnl Existing row identifiers, including external-id aliases, remain valid.
+check ovn-nbctl set Logical_Switch sw 'external_ids:"neutron:network_name"=alias'
+AT_CHECK([ovn-nbctl show-table Logical_Switch alias > by-alias])
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw > by-name])
+AT_CHECK([cmp by-alias by-name])
+check ovn-nbctl --add-duplicate ls-add sw
+AT_CHECK([ovn-nbctl show-table Logical_Switch sw], [1], [], [dnl
+ovn-nbctl: multiple rows in Logical_Switch match "sw"
+])
+])
+
 OVN_NBCTL_TEST([ovn_nbctl_basic_switch], [basic switch commands], [
 AT_CHECK([ovn-nbctl ls-add ls0])
 AT_CHECK([ovn-nbctl ls-list | uuidfilt], [0], [dnl

@@ -46,6 +46,19 @@ m4_define([OVN_BR_CONTROLLER_STOP],[
    OVS_APP_EXIT_AND_WAIT([ovsdb-server])
 ])
 
+AT_SETUP([ovn-brctl - show-table])
+AT_KEYWORDS([ovn])
+check ovsdb-tool create ovn-br.db "$abs_top_srcdir/ovn-br.ovsschema"
+start_daemon ovsdb-server --remote=punix:"$OVS_RUNDIR/ovnbr_db.sock" ovn-br.db
+check ovn-brctl add-br br-show
+AT_CHECK([ovn-brctl show-table Bridge br-show > actual])
+AT_CHECK([ovn-brctl list Bridge br-show > expected])
+AT_CHECK([diff -u expected actual])
+AT_CHECK([ovn-brctl --all show-table Bridge br-show > actual])
+AT_CHECK([diff -u expected actual])
+OVS_APP_EXIT_AND_WAIT([ovsdb-server])
+AT_CLEANUP
+
 AT_SETUP([ovn-br-controller - brctl test])
 OVN_BR_CONTROLLER_START
 

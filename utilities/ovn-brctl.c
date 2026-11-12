@@ -32,6 +32,7 @@
 #include "lib/ovn-util.h"
 #include "lib/vec.h"
 #include "ovn-dbctl.h"
+#include "ovn-table-show.h"
 
 VLOG_DEFINE_THIS_MODULE(brctl);
 
@@ -492,6 +493,9 @@ Logical flow commands:\n\
   dump-flows  [BRIDGE] [LFLOW...] alias for lflow-list\n\
 \n\
 \n\n", program_name, program_name);
+    fputs(ctl_get_db_cmd_usage(), stdout);
+    ovn_table_show_usage();
+    fputs(ctl_list_db_tables_usage(), stdout);
 }
 
 int

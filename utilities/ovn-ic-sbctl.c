@@ -44,6 +44,8 @@
 #include "util.h"
 #include "svec.h"
 
+#include "ovn-table-show.h"
+
 VLOG_DEFINE_THIS_MODULE(ic_sbctl);
 
 struct ic_sbctl_context;
@@ -331,6 +333,7 @@ Options:\n\
   --oneline                   print exactly one line of output per command\n",
            program_name, program_name, ctl_get_db_cmd_usage(),
            ctl_list_db_tables_usage(), default_ic_sb_db());
+    ovn_table_show_usage();
     table_usage();
     vlog_usage();
     printf("\
@@ -1026,4 +1029,5 @@ ic_sbctl_cmd_init(void)
     ctl_init(&icsbrec_idl_class, icsbrec_table_classes, tables,
              NULL, ic_sbctl_exit);
     ctl_register_commands(ic_sbctl_commands);
+    ovn_table_show_register(tables, &table_style);
 }

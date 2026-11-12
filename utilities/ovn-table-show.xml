@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dl>
+  <dt>[<code>--all</code>] <code>show-table</code>
+    <var>table</var> <var>record</var></dt>
+  <dd>
+    <p>
+      Displays exactly one row, selected using the same table and record
+      identifiers as <code>list</code>.  All columns are displayed,
+      including <code>_uuid</code>, empty sets and maps, and default values.
+      Output uses list-style column alignment.
+    </p>
+    <p>
+      By default, UUID references declared in the schema are displayed
+      using the referenced row's nonempty <code>name</code> column, if
+      present.  Otherwise, the UUID is displayed.  Other columns, including
+      UUIDs that are not schema references, retain their usual database
+      value representation.  References in sets and maps retain their
+      delimiters and key-value associations.  This display is intended for
+      inspection, not as input to database modification commands.
+    </p>
+    <p>
+      With <code>--all</code>, reference values remain UUIDs, and the full
+      contents of referenced rows are displayed below the referring
+      column, indented by four spaces per level.  Peer rows are separated
+      by blank lines and a dashed line.  Both strong and weak forward
+      references are followed, including references in map keys and values.
+      Reverse references are not followed.  A row already on the current
+      expansion path is not expanded again, preventing cycles.  A shared
+      row can still be expanded under each of its referring rows.
+    </p>
+    <p>
+      A missing or ambiguous table or record is an error.  The command
+      requires list output with string data and headings; incompatible
+      table formatting options are rejected.  It does not change the
+      behavior of <code>show</code> or <code>list</code>.
+    </p>
+  </dd>
+</dl>

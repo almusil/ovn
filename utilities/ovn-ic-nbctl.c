@@ -45,6 +45,8 @@
 #include "util.h"
 #include "svec.h"
 
+#include "ovn-table-show.h"
+
 VLOG_DEFINE_THIS_MODULE(ic_nbctl);
 
 struct ic_nbctl_context;
@@ -379,6 +381,7 @@ Options:\n\
   --oneline                   print exactly one line of output per command\n",
            program_name, program_name, ctl_get_db_cmd_usage(),
            ctl_list_db_tables_usage(), default_ic_nb_db());
+    ovn_table_show_usage();
     table_usage();
     vlog_usage();
     printf("\
@@ -1602,4 +1605,5 @@ ic_nbctl_cmd_init(void)
     ctl_init(&icnbrec_idl_class, icnbrec_table_classes, tables,
              cmd_show_tables, ic_nbctl_exit);
     ctl_register_commands(ic_nbctl_commands);
+    ovn_table_show_register(tables, &table_style);
 }

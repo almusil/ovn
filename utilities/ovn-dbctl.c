@@ -37,6 +37,8 @@
 #include "unixctl.h"
 #include "util.h"
 
+#include "ovn-table-show.h"
+
 VLOG_DEFINE_THIS_MODULE(ovn_dbctl);
 
 /* --db: The database server to contact. */
@@ -136,6 +138,7 @@ ovn_dbctl_main(int argc, char *argv[],
                dbctl_options->cmd_show_table,
                ovn_dbctl_exit);
     ctl_register_commands(dbctl_options->commands);
+    ovn_table_show_register(dbctl_options->tables, &table_style);
 
     /* Check if options are set via env var. */
     char **argv_ = ovs_cmdl_env_parse_all(

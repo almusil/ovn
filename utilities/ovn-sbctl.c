@@ -63,6 +63,8 @@
 #include "svec.h"
 #include "vec.h"
 
+#include "ovn-table-show.h"
+
 VLOG_DEFINE_THIS_MODULE(sbctl);
 
 static void
@@ -139,6 +141,7 @@ Options:\n\
   --oneline                   print exactly one line of output per command\n",
            program_name, program_name, ctl_get_db_cmd_usage(),
            ctl_list_db_tables_usage(), default_sb_db());
+    ovn_table_show_usage();
     table_usage();
     vlog_usage();
     printf("\
@@ -1597,4 +1600,3 @@ main(int argc, char *argv[])
 
     return ovn_dbctl_main(argc, argv, &dbctl_options);
 }
-

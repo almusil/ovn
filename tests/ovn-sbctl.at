@@ -67,6 +67,40 @@ m4_define([OVN_SBCTL_TEST],
 
 dnl ---------------------------------------------------------------------
 
+OVN_SBCTL_TEST([ovn_sbctl_show_table], [show-table], [
+dnl Isolate the database fixtures from northd's RBAC maintenance.
+check ovs-appctl -t ovn-northd pause
+AT_CHECK([ovn-sbctl --id=@p create RBAC_Permission table=fixture insert_delete=false -- create RBAC_Role name=show-role 'permissions:"table one"=@p' > uuids])
+AT_CHECK([ovn-sbctl show-table RBAC_Role show-role | uuidfilt], [0], [dnl
+_uuid               : <0>
+name                : show-role
+permissions         : {"table one"=<1>}
+])
+AT_CHECK([ovn-sbctl --all show-table RBAC_Role show-role | uuidfilt], [0], [dnl
+_uuid               : <0>
+name                : show-role
+permissions         : {"table one"=<1>}
+
+    _uuid               : <1>
+    authorization       : [[]]
+    insert_delete       : false
+    table               : fixture
+    update              : [[]]
+])
+check ovn-sbctl chassis-add show-chassis geneve 192.0.2.1
+AT_CHECK([ovn-sbctl --id=@c get Chassis show-chassis -- create IGMP_Group address=239.1.1.1 chassis=@c > uuids])
+AT_CHECK([ovn-sbctl show-table IGMP_Group . > actual])
+AT_CHECK([grep '^chassis ' actual], [0], [dnl
+chassis             : show-chassis
+])
+AT_CHECK([ovn-sbctl --all show-table IGMP_Group . > expanded])
+AT_CHECK([grep '^        ip ' expanded], [0], [dnl
+        ip                  : "192.0.2.1"
+])
+AT_CHECK([ovn-sbctl show-table IGMP_Group . -- show-table IGMP_Group . > repeated])
+AT_CHECK([cat actual actual > expected; diff -u expected repeated])
+])
+
 OVN_SBCTL_TEST([ovn_sbctl_chassis_commands], [ovn-sbctl - chassis commands], [
 ovn_init_db ovn-sb
 

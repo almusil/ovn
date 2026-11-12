@@ -22,6 +22,17 @@ m4_define([OVN_IC_NBCTL_TEST_STOP],
 
 dnl ---------------------------------------------------------------------
 
+AT_SETUP([ovn-ic-nbctl - show-table])
+OVN_IC_NBCTL_TEST_START
+check ovn-ic-nbctl ts-add ts-show
+AT_CHECK([ovn-ic-nbctl show-table Transit_Switch ts-show > actual])
+AT_CHECK([ovn-ic-nbctl list Transit_Switch ts-show > expected])
+AT_CHECK([diff -u expected actual])
+AT_CHECK([ovn-ic-nbctl --all show-table Transit_Switch ts-show > actual])
+AT_CHECK([diff -u expected actual])
+OVN_IC_NBCTL_TEST_STOP
+AT_CLEANUP
+
 AT_SETUP([ovn-ic-nbctl])
 OVN_IC_NBCTL_TEST_START
 

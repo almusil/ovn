@@ -549,6 +549,7 @@ fi
 %{_bindir}/ovn-br-controller
 %{_bindir}/ovn-brctl
 %{_mandir}/man8/ovn-br-controller.8*
+%{_mandir}/man8/ovn-brctl.8*
 %{_mandir}/man5/ovn-br.5*
 %config %{_datadir}/ovn/ovn-br.ovsschema
 %{_unitdir}/ovn-br-controller.service

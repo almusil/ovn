@@ -1,5 +1,8 @@
 Post v26.09.0
 --------------
+   - Added "show-table TABLE RECORD" to the NB, SB, IC, and bridge database
+     utilities, with named references by default and recursive row contents
+     with "--all".
    - Router policies that used the deprecated "nexthop" column used to
      always be skipped and not applied. Now these router policies are
      only skipped if their action is "reroute". Router policies of type

@@ -26,6 +26,7 @@ EXTRA_DIST += \
     utilities/ovn-ctl.8.xml \
     utilities/ovn-nbctl.8.xml \
     utilities/ovn-sbctl.8.xml \
+    utilities/ovn-table-show.xml \
     utilities/ovn-ic-nbctl.8.xml \
     utilities/ovn-ic-sbctl.8.xml \
     utilities/ovn-appctl.8.xml \
@@ -46,6 +47,7 @@ CLEANFILES += \
     utilities/ovn-lib \
     utilities/ovn-nbctl.8 \
     utilities/ovn-sbctl.8 \
+    utilities/ovn-brctl.8 \
     utilities/ovn-ic-nbctl.8 \
     utilities/ovn-ic-sbctl.8 \
     utilities/ovn-trace.8 \
@@ -61,6 +63,8 @@ utilities/ovn-lib: $(top_builddir)/config.status
 # ovn-nbctl
 bin_PROGRAMS += utilities/ovn-nbctl
 utilities_ovn_nbctl_SOURCES = \
+    utilities/ovn-table-show.c \
+    utilities/ovn-table-show.h \
     utilities/ovn-dbctl.c \
     utilities/ovn-dbctl.h \
     utilities/ovn-nbctl.c
@@ -69,6 +73,8 @@ utilities_ovn_nbctl_LDADD = lib/libovn.la $(OVSDB_LIBDIR)/libovsdb.la $(OVS_LIBD
 # ovn-sbctl
 bin_PROGRAMS += utilities/ovn-sbctl
 utilities_ovn_sbctl_SOURCES = \
+    utilities/ovn-table-show.c \
+    utilities/ovn-table-show.h \
     utilities/ovn-dbctl.c \
     utilities/ovn-dbctl.h \
     utilities/ovn-sbctl.c
@@ -76,12 +82,16 @@ utilities_ovn_sbctl_LDADD = lib/libovn.la $(OVSDB_LIBDIR)/libovsdb.la $(OVS_LIBD
 
 # ovn-ic-nbctl
 bin_PROGRAMS += utilities/ovn-ic-nbctl
-utilities_ovn_ic_nbctl_SOURCES = utilities/ovn-ic-nbctl.c
+utilities_ovn_ic_nbctl_SOURCES = utilities/ovn-ic-nbctl.c \
+    utilities/ovn-table-show.c \
+    utilities/ovn-table-show.h
 utilities_ovn_ic_nbctl_LDADD = lib/libovn.la $(OVSDB_LIBDIR)/libovsdb.la $(OVS_LIBDIR)/libopenvswitch.la
 
 # ovn-ic-sbctl
 bin_PROGRAMS += utilities/ovn-ic-sbctl
-utilities_ovn_ic_sbctl_SOURCES = utilities/ovn-ic-sbctl.c
+utilities_ovn_ic_sbctl_SOURCES = utilities/ovn-ic-sbctl.c \
+    utilities/ovn-table-show.c \
+    utilities/ovn-table-show.h
 utilities_ovn_ic_sbctl_LDADD = lib/libovn.la $(OVSDB_LIBDIR)/libovsdb.la $(OVS_LIBDIR)/libopenvswitch.la
 
 # ovn-trace
@@ -111,6 +121,8 @@ utilities_ovn_debug_LDADD = lib/libovn.la $(OVSDB_LIBDIR)/libovsdb.la $(OVS_LIBD
 # ovn-brctl
 bin_PROGRAMS += utilities/ovn-brctl
 utilities_ovn_brctl_SOURCES = \
+    utilities/ovn-table-show.c \
+    utilities/ovn-table-show.h \
     utilities/ovn-dbctl.c \
     utilities/ovn-dbctl.h \
     utilities/ovn-brctl.c

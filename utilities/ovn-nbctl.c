@@ -52,6 +52,8 @@
 #include "vec.h"
 #include "uuidset.h"
 
+#include "ovn-table-show.h"
+
 VLOG_DEFINE_THIS_MODULE(nbctl);
 
 /* Should we wait (if specified by 'wait_type') even if the commands don't
@@ -609,6 +611,7 @@ Options:\n\
   --oneline                   print exactly one line of output per command\n",
            ctl_get_db_cmd_usage(),
            ctl_list_db_tables_usage(), default_nb_db());
+    ovn_table_show_usage();
     table_usage();
     daemon_usage();
     vlog_usage();

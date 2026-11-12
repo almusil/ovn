@@ -203,6 +203,8 @@
     </p>
 
     <xi:include href="lib/db-ctl-base.xml" xmlns:xi="http://www.w3.org/2003/XInclude"/>
+    <xi:include href="utilities/ovn-table-show.xml"
+                xmlns:xi="http://www.w3.org/2003/XInclude"/>
 
     <h1>Remote Connectivity Commands</h1>
     <dl>
